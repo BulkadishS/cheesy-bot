@@ -13,16 +13,21 @@ bot.setMyCommands([
     {command: '/start', description: 'начало'},
     {command: '/account', description: 'мой аккаунт'},
     {command: '/help', description: 'список команд'},
-    {command: '/cheese', description: 'показать сыры (бонусы)'} 
+    {command: '/cheese', description: 'показать сыры (бонусы)'},
+    {command: '/verify', description: 'проверка на бота'} 
 ])
 console.log('bot running...')
 
+// память о попытках и блокировке
+const verifyAttempts = {}   // chatId - количество попыток
+const blockedUsers = {}     // chatId - время конца блокировки
+const verifiedUsers = {}    // chatId - прошел проверку или нет
+
 const start = () => {
     bot.on('message', async msg => {
-        // создаем переменные и присваиваем к ним грубо говоря короткие названия шобы красиво все сморелось не сырно
         const chatId = msg.chat.id
         const text = msg.text
-        // баланс в рублях и бонусные сыры также тот белый список
+
         let balance = Math.floor(Math.random() * 5000); // баланс случайный для прикола
         let cheese = Math.floor(Math.random() * 20); // количество сыра (бонусов)
         let whitelist = false;
@@ -39,7 +44,8 @@ const start = () => {
                 `🏦 Твой личный кабинет , ${msg.from.first_name}🧀 \n\n` +
                 `💳 баланс: ${balance} ₽\n` +
                 `🧀 бонусы (сыры): ${cheese}\n` +
-                `📄 в белом списке: ${whitelist ? 'да🔒' : 'нет🔓'}`
+                `📄 в белом списке: ${whitelist ? 'да🔒' : 'нет🔓'}\n` +
+                `🤖 проверка на бота: ${verifiedUsers[chatId] ? '✅ пройдено' : '❌ не пройдено'}`
             )
         }
 
@@ -50,7 +56,8 @@ const start = () => {
                 '/start – запуск\n' +
                 '/account – мой аккаунт\n' +
                 '/cheese – показать свои бонусы (сыры)\n' +
-                '/help – помощь'
+                '/help – помощь\n' +
+                '/verify – проверка на бота'
             )
         }
 
@@ -58,11 +65,72 @@ const start = () => {
         if (text === '/cheese') {
             bot.sendMessage(chatId, `🧀 у тебя ${cheese} бонусных кусочков сыра`)
         }
-    })
 
+        //  проверку на бота (капча)
+        if (text === '/verify') {
+            // если заблокирован то не даем выполнять
+            if (blockedUsers[chatId] && Date.now() < blockedUsers[chatId]) {
+                let waitMinutes = Math.ceil((blockedUsers[chatId] - Date.now()) / 60000)
+                return bot.sendMessage(chatId, `🚫 Ты уже просрал все попытки, так нахуя возращаешься, приходи через ${waitMinutes} минут.`)
+            }
+
+            // сбрасываем попытки
+            verifyAttempts[chatId] = 0
+
+            bot.sendMessage(chatId, '🤖 Для подтверждения, что ты не бот, выбери правильный ответ:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '2 + 2 = 4', callback_data: 'right' },
+                            { text: '2 + 2 = 5', callback_data: 'wrong' }
+                        ]
+                    ]
+                }
+            })
+        }
+    })
 }
 
 // вызываем функцию
 start()
+
+// обработка нажатий кнопок для проверки на бота
+bot.on('callback_query', async query => {
+    const chatId = query.message.chat.id
+
+    // правильный ответ
+    if (query.data === 'right') {
+        verifiedUsers[chatId] = true // сохраняем что прошел проверку
+        bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: query.message.message_id }) // убираем кнопки
+        bot.sendMessage(chatId, '✅ Проверка пройдена, доступ разрешён! Ты трушный сырочек')
+        return
+    }
+
+    // неправильный ответ
+    if (query.data === 'wrong') {
+        verifyAttempts[chatId] = (verifyAttempts[chatId] || 0) + 1
+
+        // если 3 попытки просраны
+        if (verifyAttempts[chatId] >= 3) {
+            blockedUsers[chatId] = Date.now() + 15 * 60 * 1000 // блокируем на 15 минут
+            bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: query.message.message_id }) // убираем кнопки
+            bot.sendMessage(chatId, '❌ Все попытки потрачены. Приходи через 15 минут! или вообще иди нахуй сырок подзалупный блять ублюдак')
+        } else {
+            // еще есть попытки
+            let left = 3 - verifyAttempts[chatId]
+            bot.sendMessage(chatId, `❌ Ошибка! Далбоеб не можешь решить такой пример у тебя осталось попыток: ${left}`, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '2 + 2 = 4', callback_data: 'right' },
+                            { text: '2 + 2 = 5', callback_data: 'wrong' }
+                        ]
+                    ]
+                }
+            })
+        }
+    }
+})
+
 // шоб находило сырные ошыбки
 bot.on('polling_error', console.error)

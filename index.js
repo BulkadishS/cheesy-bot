@@ -15,18 +15,12 @@ bot.setMyCommands([
     {command: '/balance', description: 'балик'},
     {command: '/help', description: 'список команд'},
     {command: '/cheese', description: 'показать сыры (бонусы)'},
-    {command: '/verify', description: 'проверка на бота'}
 ])
 console.log('bot running...')
 
 
-const userCaptcha = {} // правильные ответы на капчу, на каждого пользователя сырного
-const verifiedUsers = {} // кто уже прошёл капчу — больше не доебываемся
-const captchaAttempts = {} // *попытки для капчи
-// const userTimeouts = {} // *таймаут для ебланов, которые завалили капчу (будущее обновление)
-let balance = Math.floor(Math.random() * 5000) // баланс (будущая обнова)
+const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
 let cheese = Math.floor(Math.random() * 20) // количество сыра (бонусов)
-let whitelist = false
 
 
 const start = () => {
@@ -34,6 +28,23 @@ const start = () => {
         const chatId = msg.chat.id
         const userId = msg.from.id
         const text = msg.text
+        // *шаблонная уникальная анкета для каждого юзера(желательно проверять консоль логом при разработке сырной)
+        if (!userData[userId]) {
+            userData[userId] = {
+                // уникальная капча для юзера
+                userCaptcha: undefined,
+                // сколько попыток осталось у юзера(при верификации уже удаляется)
+                captchaAttempts: 4,
+                // голда не на балике
+                balance: 0,
+                // чушпан или нет
+                whitelist: false,
+            // проверен ли хуй этот
+                verifiedUsers: false
+            }
+        }
+        // ПРОВЕРКА ДАННЫХ ЮЗЕРА !!!!!!!!!!!!!!!!!!!!!!!!!!! самое главное нахуй оно жизнь спасло мне и золочеву
+        console.log(userData[userId])
 
         // лан опишу как капча работает ПРОЧИТАЙ, ПОЛЕЗНО НАХУЙ
         function captcha() {
@@ -49,37 +60,35 @@ const start = () => {
             return captchaResult
         }
 
+        // ЕСЛИ ТИП ЗАЕБЛАНИЛ КАПЧУ ТО КАК САШУКА ПОД ЗОЛОЧЕВ
+        if (userData[userId].captchaAttempts === 0 && !['/start'].includes(text) && text !== userData[userId]?.userCaptcha) {
+            bot.sendMessage(chatId, `вам запрещен доступ изза фейла капчи`)
+            return
+        }
         switch (text) {
             //проверка на капчу(обнова)
             case '/start':
-                // *ЕСЛИ ТИП ЗАЕБЛАНИЛ КАПЧУ ТО ОН КАК САШУК ПОД ХАРЬКОВОМ БУДЕТ
-                if (!verifiedUsers[userId] && captchaAttempts[userId] === 0) {
-                    console.log(`сколько попыток осталось после хуйни всей: ` + captchaAttempts[userId])
-                    bot.sendMessage(chatId, 'ПОШЕЛ НАХУЙ УЕБИЩЕ')
-                    return
-                }
                 // *отсылаем капчу если навичок
-                if (!verifiedUsers[userId]) {
+                if (!userData[userId].verifiedUsers) {
                     // ВАЖНО, сендкапча это мы объвляем ту самую капчу которая закрытая в функции была
                     const sendCaptcha = captcha()
-                    userCaptcha[userId] = sendCaptcha
-                    captchaAttempts[userId] = 4
+                    userData[userId].userCaptcha = sendCaptcha
                     bot.sendMessage(chatId, 'Шо ты лысый🧀😂, пройди проверку на бота епта \n\n⌨️ введи то что написано ниже и отправь:\n\n' + sendCaptcha)
                     return
                 }
                 // *если навичок то похуй на нево
                 bot.sendMessage(chatId, '✅ Ты уже проверен, можешь работать дальше.И если надо меню, глянь /help')
-                console.log(`проверен на капче?: ${verifiedUsers[userId] ? 'да' : 'ошибка'}`)
+                console.log(`проверен на капче?: ${userData[userId].verifiedUsers ? 'да' : 'ошибка'}`)
                 break
 
             case '/account':
                 // личный кабинет для сыров
                 bot.sendMessage(chatId, 
                     `🏦 Твой личный кабинет , ${msg.from.first_name}🧀 \n\n` +
-                    `💳 баланс: ${balance} ₽\n` +
+                    `💳 баланс: ${userData[userId].balance} ₽\n` +
                     `🧀 бонусы (сыры): 🧀${cheese}\n` +
-                    `📄 в белом списке: ${whitelist ? '🔒да' : '🔓 нет'}\n` +
-                    `🤖 проверка на бота: ${verifiedUsers[userId] ? '✅ пройдено' : '❌ ошибка'}`
+                    `📄 в белом списке: ${userData[userId].whitelist ? '🔒да' : '🔓 нет'}\n` +
+                    `🤖 проверка на бота: ${userData[userId].verifiedUsers ? '✅ пройдено' : '❌ ошибка'}`
                 )
                 break
             
@@ -105,19 +114,20 @@ const start = () => {
 
             // *проверка на капчу, перенес с обновой
             default:
-                if (!verifiedUsers[userId] && userCaptcha[userId]) {
+                if (!userData[userId].verifiedUsers && userData[userId].userCaptcha) {
                     // *проверяем верно тип отправил капчу чи не
-                    if (text === userCaptcha[userId]) {
-                        verifiedUsers[userId] = true
+                    if (text === userData[userId].userCaptcha) {
+                        userData[userId].verifiedUsers = true
                         bot.sendMessage(chatId, '✅Проверка пройдена сыр ебанный, теперь ты можешь пройти дальше по той же команде /start')
-                        delete captchaAttempts[userId]
+                        delete userData[userId].userCaptcha
+                        delete userData[userId].captchaAttempts
                     } else {
                         // *папытки на капче, короче вместо цикла ебучий иф который выглядит убого нахуй
-                        if (captchaAttempts[userId] > 0) {
-                            captchaAttempts[userId]--
-                            await bot.sendMessage(chatId, `❌ Введено неправильно, осталось попыток: ❗ ${captchaAttempts[userId]} ❗`)
+                        if (userData[userId].captchaAttempts > 0) {
+                            userData[userId].captchaAttempts--
+                            await bot.sendMessage(chatId, `❌ Введено неправильно, осталось попыток: ❗ ${userData[userId].captchaAttempts} ❗`)
                             // *если ПРОЕБАЛСЯ, то лох ебанный
-                            if (captchaAttempts[userId] === 0) {
+                            if (userData[userId].captchaAttempts === 0) {
                                 await bot.sendMessage(chatId, '⛔ Капча не была пройдена еблан, пососи')
                                 return
                             }
@@ -127,7 +137,6 @@ const start = () => {
         }
     })
 }
-
 // вызываем функцию
 start()
 // шоб находило сырные ошыбки

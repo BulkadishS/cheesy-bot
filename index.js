@@ -245,10 +245,13 @@ bot.on('callback_query', async (query) => {
                 }
                 await bot.editMessageText(
                     '🎉 **Поздравляем!**\n\n✅ Вы подписаны и получили **+5 🧀**! Можете теперь пользоваться нашими услугами по команде /start',
-                    {chat_id: cbUserId, message_id: localMessageId, parse_mode: 'Markdown'}
+                    {
+                        chat_id: cbUserId, 
+                        message_id: localMessageId, 
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: []}
+                    }
                 )
-
-                await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: cbUserId, message_id: localMessageId })
 
             } else {
                 await bot.editMessageText(

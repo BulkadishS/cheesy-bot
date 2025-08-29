@@ -1,21 +1,12 @@
-// токен берем с .env файла
 require('dotenv').config()
 const token = process.env.BOT_TOKEN
-
-// апишка Телеграм
 const TelegramApi = require('node-telegram-bot-api')
-
-// создаем бота, делая ему параметры(токен и прочая хуйня кароче сыр залупа)
 const bot = new TelegramApi(token, {polling: true})
+const CHANNEL_ID = '-1003074067217'
 
-// ID канала
-CHANNEL_ID = '-1003074067217'
-
-// тут короч темка шоб когда нажимал кнопку возле чата быстрый доступ удобно короч
 bot.setMyCommands([
     {command: '/start', description: 'начало'},
     {command: '/account', description: 'мой аккаунт'},
-    {command: '/balance', description: 'балик'},
     {command: '/ref', description: 'реферальная ссылка'},
     {command: '/help', description: 'список команд'},
     {command: '/cheese', description: 'показать сыры (бонусы)'}
@@ -85,16 +76,14 @@ bot.on('message', async msg => {
     // обнова, перенес в функцию так как не работает в callback_query функция где проверяет рефералки и всякая хуйня
     const u = createUser(userId)
 
-    // проверка вечного бана
+    // проверка на бан включая временный и пермач
     if (u.banned) {
-        await bot.sendMessage(chatId, 'доступ закрыт навсегда, ты высрал все шансы на капче')
+        await bot.sendMessage(chatId, '❌ Упс! Доступ закрыт навсегда.\nВы не прошли проверку на бота. 🧀')
         return
     }
-
-    // проверка бан-таймера
     if (u.banUntil && Date.now() < u.banUntil) {
         const mins = Math.ceil((u.banUntil - Date.now()) / 60000)
-        await bot.sendMessage(chatId, `⌛ отдыхай ещё ${mins}мин и приходи по /start`)
+        await bot.sendMessage(chatId, `⌛ Осталось ${mins} мин до следующей попытки. Попробуй снова командой /start 🧀`, { parse_mode: 'Markdown' });
         return
     } else if (u.banUntil && Date.now() >= u.banUntil) delete u.banUntil
 
@@ -103,21 +92,27 @@ bot.on('message', async msg => {
     if (text.startsWith('/start')) {
         // чекает рефералку
         referalSystem(userId, text, u)
-
         if (!u.verifiedUsers) {
             if (u.chancesLeft <= 0) {
                 u.banned = true
-                await bot.sendMessage(chatId, ' ты высрал все шансы, доступ закрыт навсегда')
+                await bot.sendMessage(chatId, '🚫 Доступ закрыт навсегда!\n\nВы исчерпали все свои шансы. Если думаете, что это ошибка, свяжитесь с администратором. 🧀')
                 return
             }
             // отправляет капчу
             const sendCaptcha = captcha()
             u.userCaptcha = sendCaptcha
-            await bot.sendMessage(chatId, 'шо ты лысый🧀😂, пройди проверку на бота \n\n⌨️ введи то что написано ниже и отправь:\n\n' + sendCaptcha)
+            await bot.sendMessage(chatId, 
+`🧀 Привет, ${msg.from.first_name}!  
+
+🚀 Перед началом работы нужно убедиться, что ты не бот.  
+
+⌨️ Введи точно то, что написано ниже и отправь:\n\n` + sendCaptcha, 
+{ parse_mode: 'Markdown' }
+)            
             return
         }
 
-        bot.sendMessage(chatId, 'короче тут надо будет типо запуск впн и тарифы подписки')
+        await bot.sendMessage(chatId, 'короче тут надо будет типо запуск впн и тарифы подписки')
         return
     }
 
@@ -130,8 +125,7 @@ bot.on('message', async msg => {
                 `🏦 Твой личный кабинет , ${msg.from.first_name}🧀 \n\n` +
                 `💳 баланс: ${u.balance} ₽\n` +
                 `🧀 бонусы (сыры): 🧀${u.cheese}\n` +
-                `📄 в белом списке: ${u.whitelist ? '🔒да' : '🔓 нет'}\n` +
-                `🤖 проверка на бота: ${u.verifiedUsers ? '✅ пройдено' : '❌ ошибка'}`
+                `📄 в белом списке: ${u.whitelist ? '🔒да' : '🔓 нет'}`
             )
             break
 
@@ -144,19 +138,25 @@ bot.on('message', async msg => {
                 '📖 список команд:\n' +
                 '/start – запуск\n' +
                 '/account – мой аккаунт\n' +
-                '/balance - голда на балике\n' +
-                '/cheese – показать свои бонусы (сыры)\n' +
                 '/ref – твоя реферальная ссылка\n' +
-                '/help – помощь\n'
+                '/cheese – показать свои бонусы (сыры)\n' +
+                '/help – помощь'
             )
             break
 
         case '/cheese':
-            await bot.sendMessage(chatId, `🧀 у тебя на счету: ${u.cheese} 🧀 бонусных сыров!`)
+            const cheeseBonusCheckMSG = `🧀 Твои бонусные сыры: ${u.cheese} 
+            Хотите заработать больше сыра? 🤑  
+            Выполняйте задания и приглашайте друзей! 👇  
+
+            Используй команду /ref чтобы пригласить друзей и получать бонусы ✉️
+            Выполняй другие задания, чтобы увеличить свой баланс сыра 🧀`
+
+            await bot.sendMessage(chatId, cheeseBonusCheckMSG, { parse_mode: 'Markdown' })
             break
 
         case '/ref':
-            await bot.sendMessage(chatId, 'Нажми на кнопку ниже, чтобы пригласить друга и получить бонусы🧀!:', {
+            await bot.sendMessage(chatId, '🎁 Пригласи друга и получи 10 бонусных сыров 🧀!\nНажми на кнопку ниже, чтобы поделиться ссылкой:', {
                 reply_markup: {
                     inline_keyboard: [
                         [
@@ -201,13 +201,13 @@ bot.on('message', async msg => {
                             u.chancesLeft--
                             if (u.chancesLeft <= 0) {
                                 u.banned = true
-                                await bot.sendMessage(chatId, ' ты высрал все шансы (3 из 3), доступ закрыт навсегда ')
+                                await bot.sendMessage(chatId, '❌ Ты исчерпал все шансы (3 из 3).\n🚫 Доступ к боту закрыт навсегда.')
                                 return
                             }
                             u.banUntil = Date.now() + 2 * 60 * 1000
                             u.captchaAttempts = 4
                             delete u.userCaptcha
-                            await bot.sendMessage(chatId, `ты проебал 3 попытки. осталось шансов: ${u.chancesLeft}. жди 2 мин и приходи снова по /start`)
+                            await bot.sendMessage(chatId, `⚠️ Ты исчерпал 3 попытки.\nОсталось шансов: ${u.chancesLeft}.\n⏳ Подожди 2 минуты и попробуй снова командой /start.`)
                             return
                         }
                     }
@@ -222,46 +222,78 @@ bot.on('callback_query', async (query) => {
     const data = query.data
     const u = createUser(cbUserId)
     const inviterId = userData[cbUserId].invitedBy
-    // локальные чат айди и айди сообщения
-    const localChatId = query.message.chat.id
+    // локальный айди сообщения
     const localMessageId = query.message.message_id
-
     if (!u || (!u.verifiedUsers && data !== 'check')) return
+    try {
+        if (data === 'check') {
+            // переменные проверка на подписку
 
-    if (data === 'check') {
-        // удаляем нахуй то сообщение как ты и хотел
-        await bot.deleteMessage(localChatId, localMessageId)
+            const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
+            const subscribed = ['member', 'administrator', 'creator'].includes(requestMember.status)
+            // проверка на подписку канала и начисление бонус за это
+            if(subscribed) {            
+                u.cheese += 5
 
-        const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
-        if(['member', 'administrator', 'creator'].includes(requestMember.status)) {
-            await bot.sendMessage(cbUserId, '✅ Вы подписаны на канал, вы получили 5 сыров!')
-            u.cheese += 5
-        } else {
-            await bot.sendMessage(cbUserId, '❌ Вы не подписаны на канал, вы не получили бонусы😭')
+                // проверка на рефералку
+
+                if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
+                    userData[inviterId].cheese += 10
+                    u.getCheeseRefBonus = true
+                    await bot.sendMessage(u.invitedBy, `🎉 По твоей ссылке зарегистрировался и подписался новый пользователь!\nТы получил +10 🧀!
+                    👉 Теперь ты можешь посмотреть сколько у тебя сейчас сыров /cheese`)
+                }
+                await bot.editMessageText(
+                    '🎉 **Поздравляем!**\n\n✅ Вы подписаны и получили **+5 🧀**! Можете теперь пользоваться нашими услугами по команде /start',
+                    {chat_id: cbUserId, message_id: localMessageId, parse_mode: 'Markdown'}
+                )
+
+                await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: cbUserId, message_id: localMessageId })
+
+            } else {
+                await bot.editMessageText(
+                    '❌ Вы ещё **не подписаны**.\n\nПодпишитесь и нажмите «Проверить подписку» снова, чтобы получить **+5 🧀**!',
+                    {
+                        chat_id: cbUserId,
+                        message_id: localMessageId,
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                {text: '🔄 Проверить подписку', callback_data: 'check'},
+                                {text: '➡️ Перейти в канал', url: 'https://t.me/cheessechanel'}
+                            ]]
+                        }
+                    }
+                )
+            }
         }
 
-        // та самая проверка на перешел кто то по ссылке или нет, ты такое писал уже так шо должен понять шо как работает, если нет напиши сыр ебаный
-        if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
-            userData[inviterId].cheese += 10
-
-            await bot.sendMessage(inviterId, `По твоей ссылке зарегестрировался новый пользователь, ты получил 10 сыра!\n` +
-            `теперь у тебя: ${userData[inviterId].cheese} единиц сыра!`)
-            u.getCheeseRefBonus = true
-        }
+        await bot.answerCallbackQuery(query.id)
+    } catch(err) {
+        console.log('ошибка при проверке полписки', err)
     }
 })
 
 // поделиться через кнопку
 bot.on('inline_query', async (query) => {
     const referalLink = `https://t.me/orangeCheesyBot?start=${query.from.id}`
-    const messageRequest = `Привет! Используй бота вместе со мной! Присоеденяйся: ${referalLink}`
+    const messageRequest = `*Привет!* 👋
+    Используй *сырный VPN* 🧀 вместе со мной и получай безопасный и быстрый доступ к интернету.
+    Пройди проверку на бота и подпишись чтобы ты и твой друг получили *бонусов* 😉
+
+    🎁 *Бесплатные услуги* уже ждут тебя!
+
+    Подключайся прямо сейчас: [Нажми здесь](${referalLink})`
+
     const results = [
         {
             type: 'article',
             id: 'share_ref',
-            title: '✉️Поделиться сырным ботом🧀',
+            title: '✉️ Поделиться сырным VPN ботом',
+            description: 'Бесплатный доступ к VPN для друзей на неделю!',
             input_message_content: {
-                message_text: messageRequest
+                message_text: messageRequest,
+                parse_mode: 'Markdown'
             }
         }
     ]
@@ -269,4 +301,4 @@ bot.on('inline_query', async (query) => {
 })
 
 // обработка ошибок
-bot.on('polling_error', console.error)
+// bot.on('polling_error', console.error)

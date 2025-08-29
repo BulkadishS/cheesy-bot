@@ -24,7 +24,35 @@ console.log('bot running...')
 
 // объект с юзерами
 const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
-
+function createUser (userId) {
+    // *шаблонная уникальная анкета для каждого юзера
+    if (!userData[userId]) {
+        userData[userId] = {
+            userCaptcha: undefined, 
+            // уникальная капча
+            captchaAttempts: 4,     
+            // попытки капчи
+            chancesLeft: 3,         
+            // шансы (каждый шанс = 3 попытки)
+            balance: 0,             
+            // голда
+            cheese: 0,              
+            // бонусные сыры
+            whitelist: false,       
+            // белый список
+            verifiedUsers: false,   
+            // прошёл капчу
+            banned: false,          
+            // бан навсегда
+            banUntil: undefined,    
+            // таймер бана
+            invitedBy: undefined,
+            // кто пригласил
+            getCheeseRefBonus: false
+        }
+    }
+    return userData[userId]
+}
 // твоя функция генерации капчи
 function captcha() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -53,36 +81,9 @@ bot.on('message', async msg => {
     const chatId = msg.chat.id
     const userId = msg.from.id
     const text = msg.text
-    // *шаблонная уникальная анкета для каждого юзера
-    if (!userData[userId]) {
-        userData[userId] = {
-            userCaptcha: undefined, 
-            // уникальная капча
-            captchaAttempts: 4,     
-            // попытки капчи
-            chancesLeft: 3,         
-            // шансы (каждый шанс = 3 попытки)
-            balance: 0,             
-            // голда
-            cheese: 0,              
-            // бонусные сыры
-            whitelist: false,       
-            // белый список
-            verifiedUsers: false,   
-            // прошёл капчу
-            banned: false,          
-            // бан навсегда
-            banUntil: undefined,    
-            // таймер бана
-            invitedBy: undefined,
-            // кто пригласил
-            getCheeseRefBonus: false
-        }
-    }
-    // скороченая база данных
-    const u = userData[userId]
-    // уникальный айди для того кто кинул рефералку
-    const inviterId = u.invitedBy
+
+    // обнова, перенес в функцию так как не работает в callback_query функция где проверяет рефералки и всякая хуйня
+    const u = createUser(userId)
 
     // проверка вечного бана
     if (u.banned) {
@@ -173,15 +174,6 @@ bot.on('message', async msg => {
             // если юзер ещё не прошёл капчу и она у него есть
             if (!u.verifiedUsers && u.userCaptcha) {
                 if (text === u.userCaptcha) {
-                    // та самая проверка на перешел кто то по ссылке или нет, ты такое писал уже так шо должен понять шо как работает, если нет напиши сыр ебаный
-                    if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
-                        userData[inviterId].cheese += 10
-
-                        await bot.sendMessage(inviterId, `По твоей ссылке зарегестрировался новый пользователь, ты получил 10 сыра!\n` +
-                        `теперь у тебя: ${userData[inviterId].cheese} единиц сыра!`)
-                        u.getCheeseRefBonus = true
-                    }
-
                     // сообщение с кнопкой "Проверить подписку"
                     await bot.sendMessage(chatId, '✅ проверка пройдена! Теперь подпишись на канал и нажми кнопку "Проверить подписку".', {
                         reply_markup: {
@@ -194,26 +186,12 @@ bot.on('message', async msg => {
                         }
                     }
                     )
-                     // очищаем нах ненужные данные
                     u.verifiedUsers = true
                     delete u.userCaptcha
                     delete u.captchaAttempts
                     delete u.chancesLeft
                     delete u.banUntil
                     delete u.banned
-
-                    // удаляем нахуй кнопку ту самую
-                    bot.once('callback_query', async (query) => {
-                        if (query.data === 'check' && query.from.id === userId) {
-                            await bot.editMessageReplyMarkup(
-                                {inline_keyboard: []},
-                                {
-                                chat_id: chatId,
-                                message_id: query.message.message_id
-                            }
-                        )
-                        }
-                    })
                 } else {
                     if (u.captchaAttempts > 0) {
                         u.captchaAttempts--
@@ -237,19 +215,38 @@ bot.on('message', async msg => {
             }
     }
 })
-// 
+
+
 bot.on('callback_query', async (query) => {      
     const cbUserId = query.from.id
     const data = query.data
-    const u = userData[cbUserId]
-    if (!u || (!u.verifiedUsers && data !== 'check')) return 
+    const u = createUser(cbUserId)
+    const inviterId = userData[cbUserId].invitedBy
+    // локальные чат айди и айди сообщения
+    const localChatId = query.message.chat.id
+    const localMessageId = query.message.message_id
+
+    if (!u || (!u.verifiedUsers && data !== 'check')) return
+
     if (data === 'check') {
+        // удаляем нахуй то сообщение как ты и хотел
+        await bot.deleteMessage(localChatId, localMessageId)
+
         const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
         if(['member', 'administrator', 'creator'].includes(requestMember.status)) {
             await bot.sendMessage(cbUserId, '✅ Вы подписаны на канал, вы получили 5 сыров!')
             u.cheese += 5
         } else {
             await bot.sendMessage(cbUserId, '❌ Вы не подписаны на канал, вы не получили бонусы😭')
+        }
+
+        // та самая проверка на перешел кто то по ссылке или нет, ты такое писал уже так шо должен понять шо как работает, если нет напиши сыр ебаный
+        if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
+            userData[inviterId].cheese += 10
+
+            await bot.sendMessage(inviterId, `По твоей ссылке зарегестрировался новый пользователь, ты получил 10 сыра!\n` +
+            `теперь у тебя: ${userData[inviterId].cheese} единиц сыра!`)
+            u.getCheeseRefBonus = true
         }
     }
 })

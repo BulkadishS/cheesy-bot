@@ -1,8 +1,10 @@
-require('dotenv').config()
-const token = process.env.BOT_TOKEN
-const TelegramApi = require('node-telegram-bot-api')
-const bot = new TelegramApi(token, {polling: true})
+import dotenv from 'dotenv'
+import TelegramBot from 'node-telegram-bot-api'
+dotenv.config()
+
 const CHANNEL_ID = '-1003074067217'
+const token = process.env.BOT_TOKEN
+const bot = new TelegramBot(token, {polling: true})
 
 bot.setMyCommands([
     {command: '/start', description: 'начало'},
@@ -13,7 +15,7 @@ bot.setMyCommands([
 ])
 console.log('bot running...')
 
-// объект с юзерами
+// функции
 const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
 function createUser (userId) {
     // *шаблонная уникальная анкета для каждого юзера
@@ -44,7 +46,7 @@ function createUser (userId) {
     }
     return userData[userId]
 }
-// твоя функция генерации капчи
+
 function captcha() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     let captchaResult = ''
@@ -54,7 +56,6 @@ function captcha() {
     return captchaResult
 }
 
-// обнова || рефералка перенесена в отдельную функции от мусора
 function referalSystem (userFrom, txt, userDb) {
     const parts = txt.split(' ')
     const refId = parts[1]
@@ -66,7 +67,8 @@ function referalSystem (userFrom, txt, userDb) {
 }
 
 
-// обработка сообщений (я вынес из функции старт)
+
+// обработка сообщений
 bot.on('message', async msg => {
     // все шо связанное с обращением к юзеру
     const chatId = msg.chat.id
@@ -112,7 +114,13 @@ bot.on('message', async msg => {
             return
         }
 
-        await bot.sendMessage(chatId, 'короче тут надо будет типо запуск впн и тарифы подписки')
+        await bot.sendMessage(chatId, '📡 Добро пожаловать в наш VPN-сервис! \n\nВыберите подходящий тариф:', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{text: ' ' }]
+                ]
+            }}
+        )
         return
     }
 

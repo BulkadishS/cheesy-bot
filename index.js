@@ -1,5 +1,8 @@
+// вместо require() в сто раз нахуй удобнее
 import dotenv from 'dotenv'
 import TelegramBot from 'node-telegram-bot-api'
+// тут щя подробно короче из файла cryptobot.js высовываем КОНСТ который отвечает за оплату и всю залупу в общем, там как new вот та залупа как тут с телегой, если не понял пиши сыр
+import { crypto } from './cryptobot.js'
 dotenv.config()
 
 const CHANNEL_ID = '-1003074067217'
@@ -41,7 +44,9 @@ function createUser (userId) {
             // таймер бана
             invitedBy: undefined,
             // кто пригласил
-            getCheeseRefBonus: false
+            getCheeseRefBonus: false,
+            // крипто платежи !!!!!!!!!!!!!НОВОЕ!!!!!!!!!!!!!!
+            cryptoId : undefined
         }
     }
     return userData[userId]
@@ -103,6 +108,7 @@ bot.on('message', async msg => {
             // отправляет капчу
             const sendCaptcha = captcha()
             u.userCaptcha = sendCaptcha
+            // !!!!!!!!!!!!!!!!!! НОВОЕ !!!!!!!!!!!!!!!!!!!!!!!!!!
             await bot.sendMessage(chatId, 
 `🧀 Привет, ${msg.from.first_name}!  
 
@@ -117,14 +123,17 @@ bot.on('message', async msg => {
         await bot.sendMessage(chatId, '📡 Добро пожаловать в наш VPN-сервис! \n\nВыберите подходящий тариф:', {
             reply_markup: {
                 inline_keyboard: [
-                    [{text: ' ' }]
+                    [{text: '1 Неделя - 0₽', callback_data: 'buy_week' }],
+                    [{text: '1 Месяц - 150₽', callback_data: 'buy_month'}],
+                    [{text: '3 Месяца - 300₽', callback_data: 'buy_3month'}]
                 ]
             }}
         )
         return
     }
+    
+    ///////////////////////////////////////////
 
-    // бля егор красава яя далбаеееб недодумался перенести так легче
     console.log(u)
 
     switch (text) {
@@ -234,56 +243,110 @@ bot.on('callback_query', async (query) => {
     const localMessageId = query.message.message_id
     if (!u || (!u.verifiedUsers && data !== 'check')) return
     try {
-        if (data === 'check') {
-            // переменные проверка на подписку
 
-            const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
-            const subscribed = ['member', 'administrator', 'creator'].includes(requestMember.status)
-            // проверка на подписку канала и начисление бонус за это
-            if(subscribed) {            
-                u.cheese += 5
+        // !!!!!!!!!!!!! НОВОЕ !!!!!!!!!!!!!
 
-                // проверка на рефералку
+        switch (data) {
+            // ОПЛАТА ВПН, ВСЕ ЧТО БУДЕТ С КОШЕЛЬКАМИ СВЯЗАНО
+            
+            // НА НЕДЕЛЮ
+            case 'buy_week':
 
-                if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
-                    userData[inviterId].cheese += 10
-                    u.getCheeseRefBonus = true
-                    await bot.sendMessage(u.invitedBy, `🎉 По твоей ссылке зарегистрировался и подписался новый пользователь!\nТы получил +10 🧀!
-                    👉 Теперь ты можешь посмотреть сколько у тебя сейчас сыров /cheese`)
-                }
-                await bot.editMessageText(
-                    '🎉 **Поздравляем!**\n\n✅ Вы подписаны и получили **+5 🧀**! Можете теперь пользоваться нашими услугами по команде /start',
+                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
+                    chat_id: cbUserId,
+                    message_id: localMessageId,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            // КРИПТА
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay'}]
+                        ]
+                    }
+                })
+                break
+            
+            // ПОШЛА ОПЛАТА НА КНОПКУ
+            case 'cryptobot_pay':
+                // СОЗДАЕМ ПЛАТЕЖ ЕПТА
+                const invoice = await crypto.createInvoice({ // создаем короч ссылку для оплату где ниже в объекте указываем валюту, цену, и тд
+                    asset: 'USDT', // ТЕЗЕРЫ ШАРИШ МЕМЧИК
+                    amount: 1,
+                    description: '📡 Покупка VPN на 7 дней'
+                })
+                // РЕГАЕМ ПЛАТЕЖ НА ПОЛЬЗОВАТЕЛЯ В БАЗУ ДАННЫХ ЕПТА
+                const cryptoInvoiceId = u.cryptoId
+                // ПРОВЕРКА ЕПТА ДОПОЛНИТЕЛЬНАЯ
+                const cryptoPaymentLink = invoice.BotPayUrl || invoice.miniAppPayUrl ||invoice.webAppPayUrl
+                // ДАЛЬШЕ СООБЩЕНИЕ ПОНЯТНО
+                await bot.sendMessage(cbUserId,
+                    `📋 *Оплата VPN на 7 дней:*\n\n` +
+                    `👇 Пожалуйста, перейдите по ссылке, чтобы оплатить:\n` +
+                    `${cryptoPaymentLink}`,
                     {
-                        chat_id: cbUserId, 
-                        message_id: localMessageId, 
                         parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: []}
                     }
                 )
+                // ПРОВЕРКА ОПЛАТИЛ ЧИ НЕ, ТУТ НУЖНО КАКИЕ ТО ХУЮКИ ВЕБХУКИ КОРОЧЕ ОБСУДИТЬ НАДО 100%
+                const checkCryptoInvoice = await crypto.getInvoices({ invoices_id: cryptoInvoiceId, status: 'paid' })
 
-            } else {
-                await bot.editMessageText(
-                    '❌ Вы ещё **не подписаны**.\n\nПодпишитесь и нажмите «Проверить подписку» снова, чтобы получить **+5 🧀**!',
-                    {
-                        chat_id: cbUserId,
-                        message_id: localMessageId,
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [[
-                                {text: '🔄 Проверить подписку', callback_data: 'check'},
-                                {text: '➡️ Перейти в канал', url: 'https://t.me/cheessechanel'}
-                            ]]
+                // ТУТ Я ОСТАНОВИЛСЯ
+
+                break
+            // ПРОВЕРКА НА ПОДПИСКУ (КНОПКА) (ПЕРЕНЕС ТАК КАК ОПТИМИЗАЦИЯ КОРОЧЕ ХУЙ ТАМ ПЛАВАЛ)
+            case 'check':
+
+                const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
+                const subscribed = ['member', 'administrator', 'creator'].includes(requestMember.status)
+
+                // проверка на подписку канала и начисление бонус за это
+                if(subscribed) {            
+                    u.cheese += 5
+                    // проверка на рефералку
+                    if (inviterId && userData[inviterId] && !u.getCheeseRefBonus) {
+                        userData[inviterId].cheese += 10
+                        u.getCheeseRefBonus = true
+                        await bot.sendMessage(u.invitedBy, `🎉 По твоей ссылке зарегистрировался и подписался новый пользователь!\nТы получил +10 🧀!
+                        👉 Теперь ты можешь посмотреть сколько у тебя сейчас сыров /cheese`)
+                    }
+                    await bot.editMessageText(
+                        '🎉 **Поздравляем!**\n\n✅ Вы подписаны и получили **+5 🧀**! Можете теперь пользоваться нашими услугами по команде /start',
+                        {
+                            chat_id: cbUserId, 
+                            message_id: localMessageId, 
+                            parse_mode: 'Markdown',
+                            reply_markup: { inline_keyboard: []}
                         }
-                    }
-                )
-            }
+                    )
+                } else {
+                    await bot.editMessageText(
+                        '❌ Вы ещё **не подписаны**.\n\nПодпишитесь и нажмите «Проверить подписку» снова, чтобы получить **+5 🧀**!',
+                        {
+                            chat_id: cbUserId,
+                            message_id: localMessageId,
+                            parse_mode: 'Markdown',
+                            reply_markup: {
+                                inline_keyboard: [[
+                                    {text: '🔄 Проверить подписку', callback_data: 'check'},
+                                    {text: '➡️ Перейти в канал', url: 'https://t.me/cheessechanel'}
+                                ]]
+                            }
+                        }
+                    )
+                }
+
+                break
         }
 
         await bot.answerCallbackQuery(query.id)
     } catch(err) {
-        console.log('ошибка при проверке полписки', err)
+        console.log('ошибка в колбеке оплаты и проверки подписки ', err)
     }
 })
+
+
+// !!!!!!!!!!!! ДАЛЬШЕ НЕ ДЕЛАЛ !!!!!!!!!!!!!!!!!!!!
+
+
 
 // поделиться через кнопку
 bot.on('inline_query', async (query) => {

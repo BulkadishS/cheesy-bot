@@ -36,7 +36,9 @@ function createUser (userId) {
             // бонусные сыры
             whitelist: false,       
             // белый список
-            verifiedUsers: false,   
+            verifiedUsers: false,
+            // проверяем проверил ли он подписку
+            waitingForButtonPress: true,
             // прошёл капчу
             banned: false,          
             // бан навсегда
@@ -80,6 +82,7 @@ bot.on('message', async msg => {
     const userId = msg.from.id
     const text = msg.text
 
+
     // обнова, перенес в функцию так как не работает в callback_query функция где проверяет рефералки и всякая хуйня
     const u = createUser(userId)
 
@@ -95,9 +98,8 @@ bot.on('message', async msg => {
     } else if (u.banUntil && Date.now() >= u.banUntil) delete u.banUntil
 
 
-    // обновил и сделал так чтобы чекало рефералов также
+    // капча
     if (text.startsWith('/start')) {
-        // чекает рефералку
         referalSystem(userId, text, u)
         if (!u.verifiedUsers) {
             if (u.chancesLeft <= 0) {
@@ -105,18 +107,18 @@ bot.on('message', async msg => {
                 await bot.sendMessage(chatId, '🚫 Доступ закрыт навсегда!\n\nВы исчерпали все свои шансы. Если думаете, что это ошибка, свяжитесь с администратором. 🧀')
                 return
             }
-            // отправляет капчу
+
             const sendCaptcha = captcha()
             u.userCaptcha = sendCaptcha
-            // !!!!!!!!!!!!!!!!!! НОВОЕ !!!!!!!!!!!!!!!!!!!!!!!!!!
+
             await bot.sendMessage(chatId, 
-`🧀 Привет, ${msg.from.first_name}!  
+            `🧀 Привет, ${msg.from.first_name}!  
 
-🚀 Перед началом работы нужно убедиться, что ты не бот.  
+    🚀 Перед началом работы нужно убедиться, что ты не бот.  
 
-⌨️ Введи точно то, что написано ниже и отправь:\n\n` + sendCaptcha, 
-{ parse_mode: 'Markdown' }
-)            
+    ⌨️ Введи точно то, что написано ниже и отправь:\n\n` + sendCaptcha, 
+        { parse_mode: 'Markdown' }
+        )            
             return
         }
 
@@ -132,9 +134,58 @@ bot.on('message', async msg => {
         return
     }
     
+    if (!u.verifiedUsers && u.userCaptcha) {
+        if (text.startsWith('/') && text !== '/start') {
+            await bot.sendMessage(chatId, '🚫 *Сначала введите капчу, чтобы использовать команды*', {
+                parse_mode: 'Markdown'
+            })
+            return
+        }
+
+        if (text === u.userCaptcha) {
+            // сообщение с кнопкой "Проверить подписку"
+            await bot.sendMessage(chatId, '✅ проверка пройдена! Теперь подпишись на канал и нажми кнопку "Проверить подписку".', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {text: 'Проверить подписку', callback_data: 'check'},
+                            {text: 'Перейти в канал', url: 'https://t.me/cheessechanel'}
+                        ]
+                    ]
+                }
+            }
+            )
+            u.verifiedUsers = true
+            delete u.userCaptcha
+            delete u.captchaAttempts
+            delete u.chancesLeft
+            delete u.banUntil
+            delete u.banned
+        } else {
+            if (u.captchaAttempts > 0) {
+                u.captchaAttempts--
+                await bot.sendMessage(chatId, `введено неправильно, осталось попыток: ❗ ${u.captchaAttempts} ❗`)
+
+                if (u.captchaAttempts === 0) {
+                    u.chancesLeft--
+                    if (u.chancesLeft <= 0) {
+                        u.banned = true
+                        await bot.sendMessage(chatId, '❌ Ты исчерпал все шансы (3 из 3).\n🚫 Доступ к боту закрыт навсегда.')
+                        return
+                    }
+                    u.banUntil = Date.now() + 2 * 60 * 1000
+                    u.captchaAttempts = 4
+                    delete u.userCaptcha
+                    await bot.sendMessage(chatId, `⚠️ Ты исчерпал 3 попытки.\nОсталось шансов: ${u.chancesLeft}.\n⏳ Подожди 2 минуты и попробуй снова командой /start.`)
+                    return
+                }
+            }
+        }
+    }
     ///////////////////////////////////////////
 
     console.log(u)
+    // пока в u.userCaptcha что то есть, не выполнять условие ниже
 
     switch (text) {
         case '/account':
@@ -187,49 +238,6 @@ bot.on('message', async msg => {
                 }
             })
             break
-        default:
-            // если юзер ещё не прошёл капчу и она у него есть
-            if (!u.verifiedUsers && u.userCaptcha) {
-                if (text === u.userCaptcha) {
-                    // сообщение с кнопкой "Проверить подписку"
-                    await bot.sendMessage(chatId, '✅ проверка пройдена! Теперь подпишись на канал и нажми кнопку "Проверить подписку".', {
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    {text: 'Проверить подписку', callback_data: 'check'},
-                                    {text: 'Перейти в канал', url: 'https://t.me/cheessechanel'}
-                                ]
-                            ]
-                        }
-                    }
-                    )
-                    u.verifiedUsers = true
-                    delete u.userCaptcha
-                    delete u.captchaAttempts
-                    delete u.chancesLeft
-                    delete u.banUntil
-                    delete u.banned
-                } else {
-                    if (u.captchaAttempts > 0) {
-                        u.captchaAttempts--
-                        await bot.sendMessage(chatId, `введено неправильно, осталось попыток: ❗ ${u.captchaAttempts} ❗`)
-
-                        if (u.captchaAttempts === 0) {
-                            u.chancesLeft--
-                            if (u.chancesLeft <= 0) {
-                                u.banned = true
-                                await bot.sendMessage(chatId, '❌ Ты исчерпал все шансы (3 из 3).\n🚫 Доступ к боту закрыт навсегда.')
-                                return
-                            }
-                            u.banUntil = Date.now() + 2 * 60 * 1000
-                            u.captchaAttempts = 4
-                            delete u.userCaptcha
-                            await bot.sendMessage(chatId, `⚠️ Ты исчерпал 3 попытки.\nОсталось шансов: ${u.chancesLeft}.\n⏳ Подожди 2 минуты и попробуй снова командой /start.`)
-                            return
-                        }
-                    }
-                }
-            }
     }
 })
 
@@ -270,7 +278,7 @@ bot.on('callback_query', async (query) => {
                 // СОЗДАЕМ ПЛАТЕЖ ЕПТА
                 const invoice = await crypto.createInvoice({ // создаем короч ссылку для оплату где ниже в объекте указываем валюту, цену, и тд
                     asset: 'USDT', // ТЕЗЕРЫ ШАРИШ МЕМЧИК
-                    amount: 1,
+                    amount: 1, // цена
                     description: '📡 Покупка VPN на 7 дней'
                 })
                 // РЕГАЕМ ПЛАТЕЖ НА ПОЛЬЗОВАТЕЛЯ В БАЗУ ДАННЫХ ЕПТА
@@ -287,14 +295,14 @@ bot.on('callback_query', async (query) => {
                     }
                 )
                 // ПРОВЕРКА ОПЛАТИЛ ЧИ НЕ, ТУТ НУЖНО КАКИЕ ТО ХУЮКИ ВЕБХУКИ КОРОЧЕ ОБСУДИТЬ НАДО 100%
-                const checkCryptoInvoice = await crypto.getInvoices({ invoices_id: cryptoInvoiceId, status: 'paid' })
+                // const checkCryptoInvoice = await crypto.getInvoices({ invoices_id: cryptoInvoiceId, status: 'paid' })
 
                 // ТУТ Я ОСТАНОВИЛСЯ
 
                 break
             // ПРОВЕРКА НА ПОДПИСКУ (КНОПКА) (ПЕРЕНЕС ТАК КАК ОПТИМИЗАЦИЯ КОРОЧЕ ХУЙ ТАМ ПЛАВАЛ)
             case 'check':
-
+                u.waitingForButtonPress = false
                 const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
                 const subscribed = ['member', 'administrator', 'creator'].includes(requestMember.status)
 

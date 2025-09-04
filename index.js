@@ -136,7 +136,7 @@ bot.on('message', async msg => {
                 inline_keyboard: [
                     [{text: '1 Неделя - 0₽', callback_data: 'buy_week' }],
                     [{text: '1 Месяц - 150₽', callback_data: 'buy_month'}],
-                    [{text: '3 Месяца - 300₽', callback_data: 'buy_3month'}]
+                    [{text: '3 Месяца - 300₽', callback_data: 'buy_three_month'}]
                 ]
             }}
         )
@@ -268,7 +268,6 @@ bot.on('callback_query', async (query) => {
             
             // НА НЕДЕЛЮ
             case 'buy_week':
-
                 await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
                     chat_id: cbUserId,
                     message_id: localMessageId,
@@ -276,37 +275,105 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             // КРИПТА
-                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay'}]
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_week'}]
                         ]
                     }
                 })
                 break
-            
-            case 'cryptobot_pay':
-                const invoice = await crypto.createInvoice({
+
+            case 'cryptobot_pay_week':
+                const weekCryptoInvoice = await crypto.createInvoice({
                     asset: 'USDT',
                     amount: 1,
                     description: '📡 Покупка VPN на 7 дней'
                 })
                 // пей линк
-                const cryptoPaymentLink = invoice.BotPayUrl || invoice.miniAppPayUrl ||invoice.webAppPayUrl
+                const weekCryptoPayLink = weekCryptoInvoice.BotPayUrl || weekCryptoInvoice.miniAppPayUrl || weekCryptoInvoice.webAppPayUrl
                 // записываем инвойс
-                console.log('инвойс до: ', u.cryptoId)
-                u.cryptoId = invoice.invoice_id
-                console.log('после сохранения: ', u.cryptoId)
-
+                u.cryptoId = weekCryptoInvoice.invoice_id
                 await bot.sendMessage(cbUserId,
                     `📋 *Оплата VPN на 7 дней:*\n\n` +
                     `👇 Пожалуйста, перейдите по ссылке, чтобы оплатить:\n` +
-                    `${cryptoPaymentLink}`,
+                    `${weekCryptoPayLink}`,
                     {
                         parse_mode: 'Markdown',
                     }
                 )
-
-                // ТУТ Я ОСТАНОВИЛСЯ
-
                 break
+
+
+
+            case 'buy_month':
+                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
+                    chat_id: cbUserId,
+                    message_id: localMessageId,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            // КРИПТА
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_month'}]
+                        ]
+                    }
+                })
+                break
+
+            case 'cryptobot_pay_month':
+                const monthCryptoinvoice = await crypto.createInvoice({
+                    asset: 'USDT',
+                    amount: 1,
+                    description: '📡 Покупка VPN на месяц'
+                })
+                // пей линк
+                const monthCryptoPayLink = monthCryptoinvoice.BotPayUrl || monthCryptoinvoice.miniAppPayUrl || monthCryptoinvoice.webAppPayUrl
+                // записываем инвойс
+                u.cryptoId = monthCryptoinvoice.invoice_id
+
+                await bot.sendMessage(cbUserId,
+                    `📋 *Оплата VPN на месяц:*\n\n` +
+                    `👇 Пожалуйста, перейдите по ссылке, чтобы оплатить:\n` +
+                    `${monthCryptoPayLink}`,
+                    {
+                        parse_mode: 'Markdown',
+                    }
+                )
+                break
+
+
+            case 'buy_three_month':
+                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
+                    chat_id: cbUserId,
+                    message_id: localMessageId,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            // КРИПТА
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_three_month'}]
+                        ]
+                    }
+                })
+                break
+
+            case 'cryptobot_pay_three_month':
+                const threeMonthCryptoinvoice = await crypto.createInvoice({
+                    asset: 'USDT',
+                    amount: 1,
+                    description: '📡 Покупка VPN на 3 месяца'
+                })
+                // пей линк
+                const threeMonthCryptoPayLink = threeMonthCryptoinvoice.BotPayUrl || threeMonthCryptoinvoice.miniAppPayUrl || threeMCryptoinvoice.webAppPayUrl
+                // записываем инвойс
+                u.cryptoId = threeMonthCryptoinvoice.invoice_id
+
+                await bot.sendMessage(cbUserId,
+                    `📋 *Оплата VPN на 3 месяца:*\n\n` +
+                    `👇 Пожалуйста, перейдите по ссылке, чтобы оплатить:\n` +
+                    `${threeMonthCryptoPayLink}`,
+                    {
+                        parse_mode: 'Markdown',
+                    }
+                )
+                break
+
             // ПРОВЕРКА НА ПОДПИСКУ (КНОПКА) (ПЕРЕНЕС ТАК КАК ОПТИМИЗАЦИЯ КОРОЧЕ ХУЙ ТАМ ПЛАВАЛ)
             case 'check':
                 u.waitingForButtonPress = false

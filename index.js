@@ -7,7 +7,7 @@ dotenv.config()
 
 const CHANNEL_ID = '-1003074067217'
 const token = process.env.BOT_TOKEN
-const bot = new TelegramBot(token, {polling: true})
+export const bot = new TelegramBot(token, {polling: true})
 
 bot.setMyCommands([
     {command: '/start', description: 'начало'},
@@ -19,7 +19,7 @@ bot.setMyCommands([
 console.log('bot running...')
 
 // функции
-const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
+export const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
 function createUser (userId) {
     // *шаблонная уникальная анкета для каждого юзера
     if (!userData[userId]) {
@@ -73,13 +73,17 @@ function referalSystem (userFrom, txt, userDb) {
     return false // не зачисляем пошел он нахуй уебок бля
 }
 
-const adminId = 6336954115
+
+
+const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
 userData[adminId] = {
     balance: 0,
     cheese: 0,
     verifiedUsers: true,
     cryptoId: 'admin_crypto_id'
 }
+
+
 
 // обработка сообщений
 bot.on('message', async msg => {
@@ -104,7 +108,7 @@ bot.on('message', async msg => {
 
 
     // капча
-    if (text.startsWith('/start')) {
+    if (typeof text === 'string' && text.startsWith('/start')) {
         referalSystem(userId, text, u)
         if (!u.verifiedUsers) {
             if (u.chancesLeft <= 0) {
@@ -387,29 +391,3 @@ bot.on('inline_query', async (query) => {
 
 // обработка ошибок
 // bot.on('polling_error', console.error)
-
-import express from 'express'
-const app = express()
-app.use(express.json())
-
-app.post('/crypto/webhook', (req, res) => {
-    const update = req.body
-    console.log('Вебхук от крипты: ', update)
-
-    if (update.update_type === 'invoice_paid') {
-        const invoiceId = update.invoice.invoice_id
-        const cryptoUserId = Object.keys(userData).find(
-            uid => userData[uid].cryptoId === invoiceId
-        )
-        console.log('найден cryptoUserId:', cryptoUserId)
-        if (cryptoUserId) {
-            userData[cryptoUserId].balance += 1
-            bot.sendMessage(cryptoUserId, '✅ Оплата успешна! Доступ к VPN активирован')
-        }
-    }
-    res.sendStatus(200)
-})
-
-app.listen(3000, () => {
-    console.log('сервер запущен')
-})

@@ -73,7 +73,13 @@ function referalSystem (userFrom, txt, userDb) {
     return false // не зачисляем пошел он нахуй уебок бля
 }
 
-
+const adminId = 6336954115
+userData[adminId] = {
+    balance: 0,
+    cheese: 0,
+    verifiedUsers: true,
+    cryptoId: 'admin_crypto_id'
+}
 
 // обработка сообщений
 bot.on('message', async msg => {
@@ -81,7 +87,6 @@ bot.on('message', async msg => {
     const chatId = msg.chat.id
     const userId = msg.from.id
     const text = msg.text
-
 
     // обнова, перенес в функцию так как не работает в callback_query функция где проверяет рефералки и всякая хуйня
     const u = createUser(userId)
@@ -273,19 +278,19 @@ bot.on('callback_query', async (query) => {
                 })
                 break
             
-            // ПОШЛА ОПЛАТА НА КНОПКУ
             case 'cryptobot_pay':
-                // СОЗДАЕМ ПЛАТЕЖ ЕПТА
-                const invoice = await crypto.createInvoice({ // создаем короч ссылку для оплату где ниже в объекте указываем валюту, цену, и тд
-                    asset: 'USDT', // ТЕЗЕРЫ ШАРИШ МЕМЧИК
-                    amount: 1, // цена
+                const invoice = await crypto.createInvoice({
+                    asset: 'USDT',
+                    amount: 1,
                     description: '📡 Покупка VPN на 7 дней'
                 })
-                // РЕГАЕМ ПЛАТЕЖ НА ПОЛЬЗОВАТЕЛЯ В БАЗУ ДАННЫХ ЕПТА
-                const cryptoInvoiceId = u.cryptoId
-                // ПРОВЕРКА ЕПТА ДОПОЛНИТЕЛЬНАЯ
+                // пей линк
                 const cryptoPaymentLink = invoice.BotPayUrl || invoice.miniAppPayUrl ||invoice.webAppPayUrl
-                // ДАЛЬШЕ СООБЩЕНИЕ ПОНЯТНО
+                // записываем инвойс
+                console.log('инвойс до: ', u.cryptoId)
+                u.cryptoId = invoice.invoice_id
+                console.log('после сохранения: ', u.cryptoId)
+
                 await bot.sendMessage(cbUserId,
                     `📋 *Оплата VPN на 7 дней:*\n\n` +
                     `👇 Пожалуйста, перейдите по ссылке, чтобы оплатить:\n` +
@@ -294,8 +299,6 @@ bot.on('callback_query', async (query) => {
                         parse_mode: 'Markdown',
                     }
                 )
-                // ПРОВЕРКА ОПЛАТИЛ ЧИ НЕ, ТУТ НУЖНО КАКИЕ ТО ХУЮКИ ВЕБХУКИ КОРОЧЕ ОБСУДИТЬ НАДО 100%
-                // const checkCryptoInvoice = await crypto.getInvoices({ invoices_id: cryptoInvoiceId, status: 'paid' })
 
                 // ТУТ Я ОСТАНОВИЛСЯ
 
@@ -384,3 +387,29 @@ bot.on('inline_query', async (query) => {
 
 // обработка ошибок
 // bot.on('polling_error', console.error)
+
+import express from 'express'
+const app = express()
+app.use(express.json())
+
+app.post('/crypto/webhook', (req, res) => {
+    const update = req.body
+    console.log('Вебхук от крипты: ', update)
+
+    if (update.update_type === 'invoice_paid') {
+        const invoiceId = update.invoice.invoice_id
+        const cryptoUserId = Object.keys(userData).find(
+            uid => userData[uid].cryptoId === invoiceId
+        )
+        console.log('найден cryptoUserId:', cryptoUserId)
+        if (cryptoUserId) {
+            userData[cryptoUserId].balance += 1
+            bot.sendMessage(cryptoUserId, '✅ Оплата успешна! Доступ к VPN активирован')
+        }
+    }
+    res.sendStatus(200)
+})
+
+app.listen(3000, () => {
+    console.log('сервер запущен')
+})

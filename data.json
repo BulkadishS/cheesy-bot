@@ -1,0 +1,13 @@
+{
+  "1526913102": {
+    "captchaAttempts": 4,
+    "chancesLeft": 3,
+    "balance": 0,
+    "cheese": 0,
+    "whitelist": false,
+    "verifiedUsers": false,
+    "waitingForButtonPress": true,
+    "banned": false,
+    "getCheeseRefBonus": false
+  }
+}

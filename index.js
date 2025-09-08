@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import TelegramBot from 'node-telegram-bot-api'
 // тут щя подробно короче из файла cryptobot.js высовываем КОНСТ который отвечает за оплату и всю залупу в общем, там как new вот та залупа как тут с телегой, если не понял пиши сыр
 import { crypto } from './cryptobot.js'
+import fs from 'fs'
 dotenv.config()
 
 const CHANNEL_ID = '-1003074067217'
@@ -19,36 +20,38 @@ bot.setMyCommands([
 console.log('bot running...')
 
 // функции
-export const userData = {} // *декларируем объект для создания анкеты юзера(все параметры)
-function createUser (userId) {
+export const userData = { id: {} } // *декларируем объект для создания анкеты юзера(все параметры)
+export function createUser (userId, chatUserId) {
     // *шаблонная уникальная анкета для каждого юзера
     if (!userData[userId]) {
         userData[userId] = {
-            userCaptcha: undefined, 
-            // уникальная капча
-            captchaAttempts: 4,     
-            // попытки капчи
-            chancesLeft: 3,         
-            // шансы (каждый шанс = 3 попытки)
-            balance: 0,             
-            // голда
-            cheese: 0,              
-            // бонусные сыры
-            whitelist: false,       
-            // белый список
-            verifiedUsers: false,
-            // проверяем проверил ли он подписку
-            waitingForButtonPress: true,
-            // прошёл капчу
-            banned: false,          
-            // бан навсегда
-            banUntil: undefined,    
-            // таймер бана
-            invitedBy: undefined,
-            // кто пригласил
-            getCheeseRefBonus: false,
-            // крипто платежи !!!!!!!!!!!!!НОВОЕ!!!!!!!!!!!!!!
-            cryptoId : undefined
+            [chatUserId]: {    
+                userCaptcha: undefined, 
+                // уникальная капча
+                captchaAttempts: 4,     
+                // попытки капчи
+                chancesLeft: 3,         
+                // шансы (каждый шанс = 3 попытки)
+                balance: 0,             
+                // голда
+                cheese: 0,              
+                // бонусные сыры
+                whitelist: false,       
+                // белый список
+                verifiedUsers: false,
+                // проверяем проверил ли он подписку
+                waitingForButtonPress: true,
+                // прошёл капчу
+                banned: false,          
+                // бан навсегда
+                banUntil: undefined,    
+                // таймер бана
+                invitedBy: undefined,
+                // кто пригласил
+                getCheeseRefBonus: false,
+                // крипто платежи !!!!!!!!!!!!!НОВОЕ!!!!!!!!!!!!!!
+                cryptoId : undefined
+            }
         }
     }
     return userData[userId]
@@ -75,13 +78,13 @@ function referalSystem (userFrom, txt, userDb) {
 
 
 
-const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
-userData[adminId] = {
-    balance: 0,
-    cheese: 0,
-    verifiedUsers: true,
-    cryptoId: 'admin_crypto_id'
-}
+// const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
+// userData[adminId] = {
+//     balance: 0,
+//     cheese: 0,
+//     verifiedUsers: true,
+//     cryptoId: 'admin_crypto_id'
+// }
 
 
 
@@ -92,9 +95,22 @@ bot.on('message', async msg => {
     const userId = msg.from.id
     const text = msg.text
 
-    // обнова, перенес в функцию так как не работает в callback_query функция где проверяет рефералки и всякая хуйня
-    const u = createUser(userId)
+    // обнова, добавление юзердаты в базуданных
+    const u = createUser(userId, userId)
 
+    try {
+        const sendUserData = fs.writeFileSync('./data.json', JSON.stringify(u, null, 2), { 
+        encoding: 'utf8'
+        // flag: 'w' 
+        })
+        console.log(`файл успешно записан, отклик: ${sendUserData}`)
+
+    } catch (err) {
+        console.log(`ошибка при записи файла: ${err}`)
+    }
+
+
+    
     // проверка на бан включая временный и пермач
     if (u.banned) {
         await bot.sendMessage(chatId, '❌ Упс! Доступ закрыт навсегда.\nВы не прошли проверку на бота. 🧀')

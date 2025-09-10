@@ -21,11 +21,14 @@ console.log('bot running...')
 
 // функции
 export const userData = { id: {} } // *декларируем объект для создания анкеты юзера(все параметры)
-export function createUser (userId, chatUserId) {
+const userList = []
+export function createUser (userId, chatUserId, telegramName, userSobachka) {
     // *шаблонная уникальная анкета для каждого юзера
     if (!userData[userId]) {
         userData[userId] = {
-            [chatUserId]: {    
+            [chatUserId]: {
+                userName: telegramName,
+                userUser: userSobachka,
                 userCaptcha: undefined, 
                 // уникальная капча
                 captchaAttempts: 4,     
@@ -54,7 +57,7 @@ export function createUser (userId, chatUserId) {
             }
         }
     }
-    return userData[userId]
+    return userData[userId][chatUserId]
 }
 
 function captcha() {
@@ -76,7 +79,23 @@ function referalSystem (userFrom, txt, userDb) {
     return false // не зачисляем пошел он нахуй уебок бля
 }
 
+// !!!!!!!!!!ОБНОВА база данных
+function updateDataJSON (entry, entryId) {
+    const loadUser = createUser(entry, entryId) // создаем базу данних
+    userList.push(loadUser) // добавляем в условный массив(объясню)
+    const rawData = fs.readFileSync('data.json', { encoding: 'utf8' }) // читаем дату
+    const data = JSON.parse(rawData) // перекидываем в дату
 
+    const index = userList.findIndex(user => user.entryId === entry.id)
+    if (index !== -1) {
+        data[entry] = loadUser // перезаписываем далбаеба
+    } else {
+        data[entry] = userList.push(loadUser) // добавляем далбаеба
+    }
+
+    fs.writeFileSync('data.json', JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'w' }) // запись
+    console.log(data)
+}
 
 // const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
 // userData[adminId] = {
@@ -94,22 +113,11 @@ bot.on('message', async msg => {
     const chatId = msg.chat.id
     const userId = msg.from.id
     const text = msg.text
+    const userFirstName = msg.from.first_name
 
     // обнова, добавление юзердаты в базуданных
-    const u = createUser(userId, userId)
-
-    try {
-        const sendUserData = fs.writeFileSync('./data.json', JSON.stringify(u, null, 2), { 
-        encoding: 'utf8'
-        // flag: 'w' 
-        })
-        console.log(`файл успешно записан, отклик: ${sendUserData}`)
-
-    } catch (err) {
-        console.log(`ошибка при записи файла: ${err}`)
-    }
-
-
+    const u = createUser(userId, userId, userFirstName, msg.from.username)
+    updateDataJSON(userId, userId)
     
     // проверка на бан включая временный и пермач
     if (u.banned) {
@@ -137,7 +145,7 @@ bot.on('message', async msg => {
             u.userCaptcha = sendCaptcha
 
             await bot.sendMessage(chatId, 
-            `🧀 Привет, ${msg.from.first_name}!  
+            `🧀 Привет, ${userFirstName}!  
 
     🚀 Перед началом работы нужно убедиться, что ты не бот.  
 
@@ -209,13 +217,13 @@ bot.on('message', async msg => {
     }
     ///////////////////////////////////////////
 
-    console.log(u)
+    // console.log(u)
     // пока в u.userCaptcha что то есть, не выполнять условие ниже
 
     switch (text) {
         case '/account':
             await bot.sendMessage(chatId,
-                `🏦 Твой личный кабинет , ${msg.from.first_name}🧀 \n\n` +
+                `🏦 Твой личный кабинет , ${userFirstName}🧀 \n\n` +
                 `💳 баланс: ${u.balance} ₽\n` +
                 `🧀 бонусы (сыры): 🧀${u.cheese}\n` +
                 `📄 в белом списке: ${u.whitelist ? '🔒да' : '🔓 нет'}`
@@ -270,8 +278,8 @@ bot.on('message', async msg => {
 bot.on('callback_query', async (query) => {      
     const cbUserId = query.from.id
     const data = query.data
-    const u = createUser(cbUserId)
-    const inviterId = userData[cbUserId].invitedBy
+    const u = createUser(cbUserId, cbUserId)
+    const inviterId = u.invitedBy
     // локальный айди сообщения
     const localMessageId = query.message.message_id
     if (!u || (!u.verifiedUsers && data !== 'check')) return

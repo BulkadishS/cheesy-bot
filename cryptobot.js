@@ -2,7 +2,7 @@ import 'dotenv/config'
 import pkg from 'crypto-bot-api'
 import express from 'express'
 import { bot } from './index.js'
-import { userData } from './index.js'
+import { userData } from './database.js'
 
 const CryptoPay = pkg.default || pkg
 const app = express()

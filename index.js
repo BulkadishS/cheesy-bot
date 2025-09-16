@@ -3,7 +3,8 @@ import dotenv from 'dotenv'
 import TelegramBot from 'node-telegram-bot-api'
 // тут щя подробно короче из файла cryptobot.js высовываем КОНСТ который отвечает за оплату и всю залупу в общем, там как new вот та залупа как тут с телегой, если не понял пиши сыр
 import { crypto } from './cryptobot.js'
-import fs from 'fs'
+import { updateDataJSON, userData } from './database.js'
+
 dotenv.config()
 
 const CHANNEL_ID = '-1003074067217'
@@ -20,45 +21,6 @@ bot.setMyCommands([
 console.log('bot running...')
 
 // функции
-export const userData = { id: {} } // *декларируем объект для создания анкеты юзера(все параметры)
-const userList = []
-export function createUser (userId, chatUserId, telegramName, userSobachka) {
-    // *шаблонная уникальная анкета для каждого юзера
-    if (!userData[userId]) {
-        userData[userId] = {
-            [chatUserId]: {
-                userName: telegramName,
-                userUser: userSobachka,
-                userCaptcha: undefined, 
-                // уникальная капча
-                captchaAttempts: 4,     
-                // попытки капчи
-                chancesLeft: 3,         
-                // шансы (каждый шанс = 3 попытки)
-                balance: 0,             
-                // голда
-                cheese: 0,              
-                // бонусные сыры
-                whitelist: false,       
-                // белый список
-                verifiedUsers: false,
-                // проверяем проверил ли он подписку
-                waitingForButtonPress: true,
-                // прошёл капчу
-                banned: false,          
-                // бан навсегда
-                banUntil: undefined,    
-                // таймер бана
-                invitedBy: undefined,
-                // кто пригласил
-                getCheeseRefBonus: false,
-                // крипто платежи !!!!!!!!!!!!!НОВОЕ!!!!!!!!!!!!!!
-                cryptoId : undefined
-            }
-        }
-    }
-    return userData[userId][chatUserId]
-}
 
 function captcha() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -79,23 +41,7 @@ function referalSystem (userFrom, txt, userDb) {
     return false // не зачисляем пошел он нахуй уебок бля
 }
 
-// !!!!!!!!!!ОБНОВА база данных
-function updateDataJSON (entry, entryId) {
-    const loadUser = createUser(entry, entryId) // создаем базу данних
-    userList.push(loadUser) // добавляем в условный массив(объясню)
-    const rawData = fs.readFileSync('data.json', { encoding: 'utf8' }) // читаем дату
-    const data = JSON.parse(rawData) // перекидываем в дату
-
-    const index = userList.findIndex(user => user.entryId === entry.id)
-    if (index !== -1) {
-        data[entry] = loadUser // перезаписываем далбаеба
-    } else {
-        data[entry] = userList.push(loadUser) // добавляем далбаеба
-    }
-
-    fs.writeFileSync('data.json', JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'w' }) // запись
-    console.log(data)
-}
+// !раскомент если дебагать!
 
 // const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
 // userData[adminId] = {
@@ -105,6 +51,7 @@ function updateDataJSON (entry, entryId) {
 //     cryptoId: 'admin_crypto_id'
 // }
 
+// !раскомент если дебагать!
 
 
 // обработка сообщений
@@ -113,12 +60,12 @@ bot.on('message', async msg => {
     const chatId = msg.chat.id
     const userId = msg.from.id
     const text = msg.text
-    const userFirstName = msg.from.first_name
+    const userFirstName = msg.from.first_name // имя в телеге
 
-    // обнова, добавление юзердаты в базуданных
-    const u = createUser(userId, userId, userFirstName, msg.from.username)
-    updateDataJSON(userId, userId)
-    
+    // обнова, написал в коммите
+    const u = updateDataJSON(userId, userFirstName, msg.from.username)
+
+
     // проверка на бан включая временный и пермач
     if (u.banned) {
         await bot.sendMessage(chatId, '❌ Упс! Доступ закрыт навсегда.\nВы не прошли проверку на бота. 🧀')
@@ -278,7 +225,7 @@ bot.on('message', async msg => {
 bot.on('callback_query', async (query) => {      
     const cbUserId = query.from.id
     const data = query.data
-    const u = createUser(cbUserId, cbUserId)
+    const u = updateDataJSON(cbUserId, undefined, `${query.from.username}_Payment`) // закидываем в базу данных платежный профиль пользователя(имба нахуй ПАААА)
     const inviterId = u.invitedBy
     // локальный айди сообщения
     const localMessageId = query.message.message_id
@@ -401,6 +348,7 @@ bot.on('callback_query', async (query) => {
             // ПРОВЕРКА НА ПОДПИСКУ (КНОПКА) (ПЕРЕНЕС ТАК КАК ОПТИМИЗАЦИЯ КОРОЧЕ ХУЙ ТАМ ПЛАВАЛ)
             case 'check':
                 u.waitingForButtonPress = false
+                delete u.waitingForButtonPress
                 const requestMember = await bot.getChatMember(CHANNEL_ID, cbUserId)
                 const subscribed = ['member', 'administrator', 'creator'].includes(requestMember.status)
 

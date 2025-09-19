@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 import TelegramBot from 'node-telegram-bot-api'
 // тут щя подробно короче из файла cryptobot.js высовываем КОНСТ который отвечает за оплату и всю залупу в общем, там как new вот та залупа как тут с телегой, если не понял пиши сыр
 import { crypto } from './cryptobot.js'
-import { updateDataJSON, userData } from './database.js'
+import { updateDataJSON } from './database.js'
 
 dotenv.config()
 
@@ -64,7 +64,7 @@ bot.on('message', async msg => {
 
     // обнова, написал в коммите
     const u = updateDataJSON(userId, userFirstName, msg.from.username)
-
+    console.log(msg.from.username, userFirstName, userId)
 
     // проверка на бан включая временный и пермач
     if (u.banned) {

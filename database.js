@@ -2,16 +2,34 @@ import fs from 'fs'
 
 //создаем переменные
 export const userData = {} // сам объект юзера т.е. анкета его
-const rawData = fs.readFileSync('data.json', { encoding: 'utf8' }) // берем инфу с data.json сырую
-const data = JSON.parse(rawData) // делаем ее читабельной
-const userList = Object.values(data) // создаем массив пользователей чтобы находить его
-userList.push(data) // загружаем сохраненные данные, при перезапуске индекса
+// !!!багфикс
+let userList = []
+let data = {}
+try {
+    // норм
+    const rawData = fs.readFileSync('data.json', { encoding: 'utf8' })
+    if (rawData.trim() !== "") {
+        data = JSON.parse(rawData)
+        userList = Object.values(data)
+    } else {
+        // пустышка
+        userList = []
+        data = {}
+    }
+} catch (error) {
+    // хуйня
+    console.log('internal DB error || creating default, code: ' + error)
+    userList = []
+    data = {}
+}
+
+
 
 // *шаблонная уникальная анкета для каждого юзера
-function createUser (userId, telegramName, userSobachka) {
+function createUser (uniqueId, telegramName, userSobachka) {
     userData[userSobachka] = {
         userName: telegramName,
-        userNameId: userId,
+        userNameId: uniqueId,
         userCaptcha: undefined,
         // уникальная капча
         captchaAttempts: 4,     
@@ -39,12 +57,12 @@ function createUser (userId, telegramName, userSobachka) {
         cryptoId : undefined
     }
 
-    return userData[userId]
+    return userData[userSobachka]
 }
 
 // !!!!!!!!!!ОБНОВА база данных
 export function updateDataJSON (entry, entryName, entrySobachka) {
-    const index = userList.findIndex(user => user.userNameId === entry) // ищем конкретного юзера по массиву выше
+    const index = userList.findIndex(user => user.userNameId === entry) // ищем конкретного юзера по айдим в массиве выше
     
     // 1 условие если пользователь существует, обнову делаем
     if (index !== -1) {
@@ -58,6 +76,6 @@ export function updateDataJSON (entry, entryName, entrySobachka) {
     }
 
     // запись
-    fs.writeFileSync('data.json', JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'w' }) // запись
+    fs.writeFileSync('data.json', JSON.stringify(data, null, 2), { encoding: 'utf8' }) // запись
     return data[entrySobachka]
 }

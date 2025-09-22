@@ -11,6 +11,7 @@ const CHANNEL_ID = '-1003074067217'
 const token = process.env.BOT_TOKEN
 export const bot = new TelegramBot(token, {polling: true})
 
+
 bot.setMyCommands([
     {command: '/start', description: 'начало'},
     {command: '/account', description: 'мой аккаунт'},
@@ -41,6 +42,31 @@ function referalSystem (userFrom, txt, userDb) {
     return false // не зачисляем пошел он нахуй уебок бля
 }
 
+const shopList = [
+    [{text: '1 Неделя - 0₽', callback_data: 'buy_week' }],
+    [{text: '1 Месяц - 150₽', callback_data: 'buy_month'}],
+    [{text: '3 Месяца - 300₽', callback_data: 'buy_three_month'}]
+]
+
+const backButton = [{text: '◀️ Назад', callback_data: 'back'}]
+const setBackButton = {
+    reply_markup: {
+        inline_keyboard: [backButton]
+    }
+}
+
+async function backHandler (presserId, replaceMsgId) {
+    await bot.editMessageText('📡 Добро пожаловать в наш VPN-сервис! \n\nВыберите подходящий тариф:', 
+        {
+            chat_id: presserId,
+            message_id: replaceMsgId,
+            parse_mode: 'markdown',
+            reply_markup: {
+                inline_keyboard: shopList
+            }
+        }
+    )
+}
 // !раскомент если дебагать!
 
 // const adminId = 6336954115 // !!!!!!!!!!!!!!!!!!!!!!! тестовый админ меню
@@ -61,7 +87,7 @@ bot.on('message', async msg => {
     const userId = msg.from.id
     const text = msg.text
     const userFirstName = msg.from.first_name // имя в телеге
-
+    // bot.deleteMessage(chatId, msg.message_id)
     // обнова, написал в коммите
     const u = updateDataJSON(userId, userFirstName, msg.from.username)
     console.log(msg.from.username, userFirstName, userId)
@@ -101,16 +127,13 @@ bot.on('message', async msg => {
         )            
             return
         }
-
-        await bot.sendMessage(chatId, '📡 Добро пожаловать в наш VPN-сервис! \n\nВыберите подходящий тариф:', {
+        
+        await bot.sendMessage(userId, '📡 Добро пожаловать в наш VPN-сервис! \n\nВыберите подходящий тариф:', {
             reply_markup: {
-                inline_keyboard: [
-                    [{text: '1 Неделя - 0₽', callback_data: 'buy_week' }],
-                    [{text: '1 Месяц - 150₽', callback_data: 'buy_month'}],
-                    [{text: '3 Месяца - 300₽', callback_data: 'buy_three_month'}]
-                ]
-            }}
-        )
+                inline_keyboard: shopList
+            }
+        })
+
         return
     }
     
@@ -173,12 +196,9 @@ bot.on('message', async msg => {
                 `🏦 Твой личный кабинет , ${userFirstName}🧀 \n\n` +
                 `💳 баланс: ${u.balance} ₽\n` +
                 `🧀 бонусы (сыры): 🧀${u.cheese}\n` +
-                `📄 в белом списке: ${u.whitelist ? '🔒да' : '🔓 нет'}`
+                `📄 в белом списке: ${u.whitelist ? '🔒да' : '🔓 нет'}`,
+            setBackButton
             )
-            break
-
-        case '/balance':
-            await bot.sendMessage(chatId, `💰 твой баланс: ${u.balance} ₽`)
             break
 
         case '/help':
@@ -188,7 +208,8 @@ bot.on('message', async msg => {
                 '/account – мой аккаунт\n' +
                 '/ref – твоя реферальная ссылка\n' +
                 '/cheese – показать свои бонусы (сыры)\n' +
-                '/help – помощь'
+                '/help – помощь',
+            setBackButton
             )
             break
 
@@ -200,20 +221,15 @@ bot.on('message', async msg => {
             Используй команду /ref чтобы пригласить друзей и получать бонусы ✉️
             Выполняй другие задания, чтобы увеличить свой баланс сыра 🧀`
 
-            await bot.sendMessage(chatId, cheeseBonusCheckMSG, { parse_mode: 'Markdown' })
+            await bot.sendMessage(chatId, cheeseBonusCheckMSG, setBackButton)
             break
 
         case '/ref':
             await bot.sendMessage(chatId, '🎁 Пригласи друга и получи 10 бонусных сыров 🧀!\nНажми на кнопку ниже, чтобы поделиться ссылкой:', {
                 reply_markup: {
                     inline_keyboard: [
-                        [
-                            // рефералка кнопка
-                            {
-                                text: 'Поделиться ссылкой 🧀✉️',
-                                switch_inline_query: ''
-                            }
-                        ]
+                        [{text: 'Поделиться ссылкой 🧀✉️',switch_inline_query: ''}],
+                        backButton
                     ]
                 }
             })
@@ -235,8 +251,6 @@ bot.on('callback_query', async (query) => {
         // !!!!!!!!!!!!! НОВОЕ !!!!!!!!!!!!!
 
         switch (data) {
-            // ОПЛАТА ВПН, ВСЕ ЧТО БУДЕТ С КОШЕЛЬКАМИ СВЯЗАНО
-            
             // НА НЕДЕЛЮ
             case 'buy_week':
                 await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
@@ -246,11 +260,44 @@ bot.on('callback_query', async (query) => {
                     reply_markup: {
                         inline_keyboard: [
                             // КРИПТА
-                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_week'}]
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_week'}],
+                            backButton
                         ]
                     }
                 })
                 break
+
+            case 'buy_month':
+                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
+                    chat_id: cbUserId,
+                    message_id: localMessageId,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            // КРИПТА
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_month'}],
+                            backButton
+                        ]
+                    }
+                })
+                break
+
+            case 'buy_three_month':
+                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
+                    chat_id: cbUserId,
+                    message_id: localMessageId,
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            // КРИПТА
+                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_three_month'}],
+                            backButton
+                        ]
+                    }
+                })
+                break
+            
+            // КРИПТА
 
             case 'cryptobot_pay_week':
                 const weekCryptoInvoice = await crypto.createInvoice({
@@ -270,22 +317,6 @@ bot.on('callback_query', async (query) => {
                         parse_mode: 'Markdown',
                     }
                 )
-                break
-
-
-
-            case 'buy_month':
-                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
-                    chat_id: cbUserId,
-                    message_id: localMessageId,
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            // КРИПТА
-                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_month'}]
-                        ]
-                    }
-                })
                 break
 
             case 'cryptobot_pay_month':
@@ -309,21 +340,6 @@ bot.on('callback_query', async (query) => {
                 )
                 break
 
-
-            case 'buy_three_month':
-                await bot.editMessageText('\n💸 *Выберите способ оплаты*:\n', {
-                    chat_id: cbUserId,
-                    message_id: localMessageId,
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            // КРИПТА
-                            [{text: '🪙 Криптовалюта (Cryptobot Telegram)', callback_data: 'cryptobot_pay_three_month'}]
-                        ]
-                    }
-                })
-                break
-
             case 'cryptobot_pay_three_month':
                 const threeMonthCryptoinvoice = await crypto.createInvoice({
                     asset: 'USDT',
@@ -344,6 +360,7 @@ bot.on('callback_query', async (query) => {
                     }
                 )
                 break
+
 
             // ПРОВЕРКА НА ПОДПИСКУ (КНОПКА) (ПЕРЕНЕС ТАК КАК ОПТИМИЗАЦИЯ КОРОЧЕ ХУЙ ТАМ ПЛАВАЛ)
             case 'check':
@@ -388,6 +405,10 @@ bot.on('callback_query', async (query) => {
                     )
                 }
 
+                break
+            
+            case 'back':
+                backHandler(cbUserId, localMessageId)
                 break
         }
 
